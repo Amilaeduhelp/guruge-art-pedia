@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ගුරුගේ චිත්‍රකලා ඥානකෝෂය</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const SUPABASE_URL = 'https://uqgzlaxsnknheoerbfus.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxZ3psYXhzbmtuaGVvZXJiZnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjM2MTUsImV4cCI6MjA3OTI4MzYxNX0.IYWZ7ukx8J-GJMWy7cMk2BWnmzJmJjjE93yEmJie7nQ';
+
+        const SearchIcon = () => (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        );
+
+        const PaletteIcon = () => (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+        );
+
+        const LoaderIcon = () => (
+            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        );
+
+        const CloseIcon = () => (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        );
+
+        function ContentModal({ item, onClose, searchWord, onNavigate, navigationPath }) {
+            const contentRef = useRef(null);
+            const modalRef = useRef(null);
+            const [relatedArticles, setRelatedArticles] = useState([]);
+            const [loadingRelated, setLoadingRelated] = useState(false);
+            const [fontSize, setFontSize] = useState('base');
+            const [allWords, setAllWords] = useState([]);
+
+            useEffect(() => {
+                document.body.style.overflow = 'hidden';
+                return () => {
+                    document.body.style.overflow = 'unset';
+                };
+            }, []);
+
+            useEffect(() => {
+                const fetchAllWords = async () => {
+                    try {
+                        const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,different&word=not.is.null`;
+                        const response = await fetch(url, {
+                            headers: {
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            console.log('Fetched words:', data.length);
+                            setAllWords(data);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching all words:', err);
+                    }
+                };
+                fetchAllWords();
+            }, []);
+
+            useEffect(() => {
+                if (contentRef.current) {
+                    contentRef.current.scrollTop = 0;
+                }
+            }, [item.id]);
+
+            useEffect(() => {
+                const fetchRelatedArticles = async () => {
+                    if (!searchWord) return;
+                    setLoadingRelated(true);
+                    try {
+                        const words = searchWord.split(/\s+/).filter(w => w.length > 2);
+                        if (words.length === 0) {
+                            setLoadingRelated(false);
+                            return;
+                        }
+                        const searchTerms = words.map(w => `content.ilike.*${encodeURIComponent(w)}*`).join(',');
+                        const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&or=(${searchTerms})&word=neq.${encodeURIComponent(searchWord)}&limit=6`;
+                        const response = await fetch(url, {
+                            headers: {
+                                'apikey': SUPABASE_ANON_KEY,
+                                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            setRelatedArticles(data);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching related articles:', err);
+                    }
+                    setLoadingRelated(false);
+                };
+                fetchRelatedArticles();
+            }, [searchWord]);
+
+            const handleBackdropClick = (e) => {
+                if (modalRef.current && !modalRef.current.contains(e.target)) {
+                    onClose();
+                }
+            };
+
+            const handleWordClick = async (word) => {
+                try {
+                    const encodedWord = encodeURIComponent(word);
+                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=eq.${encodedWord}`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.length > 0) {
+                            onNavigate(data[0]);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching cross-reference:', err);
+                }
+            };
+
+            const escapeRegex = (str) => {
+                return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            };
+
+            const renderContentWithCrossReferences = (text) => {
+                if (!text || allWords.length === 0) return text;
+                
+                const allVariations = [];
+                allWords.forEach(wordObj => {
+                    if (wordObj.word === item.word) return;
+                    
+                    allVariations.push({
+                        variation: wordObj.word,
+                        mainWord: wordObj.word,
+                        id: wordObj.id
+                    });
+                    
+                    if (wordObj.different && typeof wordObj.different === 'string' && wordObj.different.trim() !== '') {
+                        const variations = wordObj.different
+                            .split('/')
+                            .map(v => v.trim())
+                            .filter(v => v.length > 2);
+                        
+                        variations.forEach(variation => {
+                            allVariations.push({
+                                variation: variation,
+                                mainWord: wordObj.word,
+                                id: wordObj.id
+                            });
+                        });
+                    }
+                });
+                
+                allVariations.sort((a, b) => b.variation.length - a.variation.length);
+                
+                let segments = [{ text: text, isLink: false }];
+
+                allVariations.forEach(varObj => {
+                    const variation = varObj.variation;
+                    const mainWord = varObj.mainWord;
+                    
+                    const newSegments = [];
+                    segments.forEach(segment => {
+                        if (segment.isLink) {
+                            newSegments.push(segment);
+                            return;
+                        }
+                        
+                        const escapedVariation = escapeRegex(variation);
+                        const regex = new RegExp(`(${escapedVariation})(?=[\\s,.:;!?()\\[\\]{}\"'\\n\\r]|$)`, 'gi');
+                        const parts = segment.text.split(regex);
+                        
+                        parts.forEach((part) => {
+                            if (part && part.toLowerCase().trim() === variation.toLowerCase().trim()) {
+                                newSegments.push({ 
+                                    text: part, 
+                                    isLink: true, 
+                                    mainWord: mainWord,
+                                    id: varObj.id
+                                });
+                            } else if (part) {
+                                newSegments.push({ text: part, isLink: false });
+                            }
+                        });
+                    });
+                    segments = newSegments;
+                });
+
+                return segments.map((segment, index) => {
+                    if (segment.isLink) {
+                        const highlighted = searchWord && segment.text.toLowerCase().trim() === searchWord.toLowerCase().trim();
+                        return (
+                            <button
+                                key={index}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleWordClick(segment.mainWord);
+                                }}
+                                className={`text-blue-600 hover:text-blue-800 underline font-semibold cursor-pointer hover:bg-blue-50 px-0.5 rounded transition-colors ${highlighted ? 'bg-yellow-200' : ''}`}
+                                title={`${segment.mainWord} වෙත යන්න`}
+                            >
+                                {segment.text}
+                            </button>
+                        );
+                    } else {
+                        if (searchWord && segment.text) {
+                            const escapedSearch = escapeRegex(searchWord);
+                            const regex = new RegExp(`(${escapedSearch})`, 'gi');
+                            const parts = segment.text.split(regex);
+                            return parts.map((part, partIdx) => {
+                                if (part.toLowerCase() === searchWord.toLowerCase()) {
+                                    return <mark key={`${index}-${partIdx}`} className="bg-yellow-200 px-1 rounded">{part}</mark>;
+                                }
+                                return <span key={`${index}-${partIdx}`}>{part}</span>;
+                            });
+                        }
+                        return <span key={index}>{segment.text}</span>;
+                    }
+                });
+            };
+
+            const getFontSizeClass = () => {
+                switch(fontSize) {
+                    case 'xs': return 'text-xs';
+                    case 'sm': return 'text-sm';
+                    case 'base': return 'text-base';
+                    case 'lg': return 'text-lg';
+                    case 'xl': return 'text-xl';
+                    default: return 'text-base';
+                }
+            };
+
+            const scrollToWord = () => {
+                if (!contentRef.current) return;
+                const marks = contentRef.current.querySelectorAll('mark');
+                if (marks.length > 0) {
+                    marks.forEach(mark => {
+                        mark.classList.remove('ring-2', 'ring-amber-600');
+                    });
+                    
+                    const firstMark = marks[0];
+                    firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    setTimeout(() => {
+                        firstMark.classList.add('ring-2', 'ring-amber-600');
+                    }, 300);
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4" onClick={handleBackdropClick}>
+                    <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col" style={{maxHeight: '95vh'}}>
+                        <div className="bg-gradient-to-r from-amber-100 to-orange-100 p-4 sm:p-6 flex justify-between items-start flex-shrink-0">
+                            <div className="flex-1 pr-2">
+                                <h2 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1 sm:mb-2 leading-tight">{item.word}</h2>
+                                <p className="text-amber-800 text-xs sm:text-sm">චිත්‍රකලා ඥානකෝෂය</p>
+                            </div>
+                            <button onClick={onClose} className="text-amber-900 hover:bg-amber-200 rounded-lg p-1.5 sm:p-2 transition-colors flex-shrink-0">
+                                <CloseIcon />
+                            </button>
+                        </div>
+
+                        {navigationPath && navigationPath.length > 0 && (
+                            <div className="px-4 sm:px-6 pt-3 pb-2 bg-amber-50 border-b-2 border-amber-200 flex-shrink-0">
+                                <p className="text-xs text-amber-700 font-semibold mb-2">ඔබගේ ගමන් මඟ:</p>
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs sm:text-sm">
+                                    {navigationPath.map((pathItem, index) => (
+                                        <React.Fragment key={index}>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onNavigate(pathItem, index);
+                                                }}
+                                                className="text-amber-800 hover:text-amber-950 hover:bg-amber-200 px-2 py-1 rounded font-semibold transition-colors underline"
+                                            >
+                                                {pathItem.word}
+                                            </button>
+                                            {index < navigationPath.length - 1 && (
+                                                <span className="text-amber-600 font-bold">|</span>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                    <span className="text-amber-600 font-bold">|</span>
+                                    <span className="text-amber-900 font-bold bg-amber-200 px-2 py-1 rounded">{item.word}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {searchWord && (
+                            <div className="px-4 sm:px-6 pt-3 sm:pt-4 flex-shrink-0">
+                                <button onClick={(e) => { e.stopPropagation(); scrollToWord(); }} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg font-semibold text-xs sm:text-sm transition-colors w-full sm:w-auto justify-center">
+                                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <span className="truncate">"{searchWord}" වචනය ඇති තැන පෙන්වන්න</span>
+                                </button>
+                            </div>
+                        )}
+
+                        <div ref={contentRef} className="p-4 sm:p-6 overflow-y-auto flex-1" style={{minHeight: 0}}>
+                            <div className="prose prose-sm sm:prose-lg max-w-none">
+                                <p className={`text-gray-800 whitespace-pre-wrap leading-relaxed ${getFontSizeClass()}`}>
+                                    {renderContentWithCrossReferences(item.content)}
+                                </p>
+
+                                {relatedArticles.length > 0 && (
+                                    <div className="mt-6 sm:mt-8 pt-6 border-t-2 border-amber-300">
+                                        <h3 className="text-lg sm:text-xl font-bold text-amber-900 mb-4 flex items-center gap-2">
+                                            <span>🎨</span>
+                                            <span>අතිරේක කියවීම්</span>
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {relatedArticles.map((article) => (
+                                                <button key={article.id} onClick={(e) => { e.stopPropagation(); onNavigate(article); }} className="text-left p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-lg border-2 border-amber-300 hover:border-amber-400 transition-all transform hover:scale-[1.02]">
+                                                    <h4 className="font-bold text-amber-900 text-sm sm:text-base mb-1 flex items-center gap-2">
+                                                        <span className="text-amber-700">→</span>
+                                                        {article.word}
+                                                    </h4>
+                                                    <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">{article.content.substring(0, 100)}...</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {loadingRelated && (
+                                    <div className="mt-6 sm:mt-8 pt-6 border-t-2 border-amber-300 text-center">
+                                        <div className="flex justify-center mb-2"><LoaderIcon /></div>
+                                        <p className="text-amber-800 text-xs sm:text-sm">අතිරේක කියවීම් සොයමින්...</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-3 sm:p-4 border-t border-gray-200 flex-shrink-0">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <span className="text-xs text-gray-700 font-semibold w-full text-center mb-1">අකුරු විශාලත්වය</span>
+                                    <button onClick={(e) => { e.stopPropagation(); setFontSize('xs'); }} className={`px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${fontSize === 'xs' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>-2</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setFontSize('sm'); }} className={`px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${fontSize === 'sm' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>-1</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setFontSize('base'); }} className={`px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${fontSize === 'base' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>සාමාන්‍ය</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setFontSize('lg'); }} className={`px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${fontSize === 'lg' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>+1</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setFontSize('xl'); }} className={`px-2 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${fontSize === 'xl' ? 'bg-amber-600 text-white shadow-xl' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>+2</button>
+                                </div>
+                                <button onClick={onClose} className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 sm:py-3 rounded-lg font-bold transition-colors text-sm sm:text-base">හරි</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [searchTerm, setSearchTerm] = useState('');
+            const [suggestions, setSuggestions] = useState([]);
+            const [showSuggestions, setShowSuggestions] = useState(false);
+            const [searchResults, setSearchResults] = useState([]);
+            const [modalContent, setModalContent] = useState(null);
+            const [isSearching, setIsSearching] = useState(false);
+            const [searchMode, setSearchMode] = useState('');
+            const searchRef = useRef(null);
+
+            const getSuggestions = async (term) => {
+                if (term.length < 1) {
+                    setSuggestions([]);
+                    return;
+                }
+                try {
+                    const encodedTerm = encodeURIComponent(term);
+                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word&word=ilike.*${encodedTerm}*&word=not.is.null&limit=10&order=word.asc`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setSuggestions(data);
+                        setShowSuggestions(data.length > 0);
+                    }
+                } catch (err) {
+                    console.error('Suggestions error:', err);
+                }
+            };
+
+            const normalSearch = async () => {
+                if (!searchTerm || searchTerm.length < 1) return;
+                setIsSearching(true);
+                setSearchResults([]);
+                setShowSuggestions(false);
+                setSearchMode('normal');
+                try {
+                    const encodedTerm = encodeURIComponent(searchTerm);
+                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=ilike.*${encodedTerm}*&word=not.is.null&order=word.asc`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setSearchResults(data);
+                    }
+                } catch (err) {
+                    console.error('Normal search error:', err);
+                } finally {
+                    setIsSearching(false);
+                }
+            };
+
+            const deepSearch = async () => {
+                if (!searchTerm || searchTerm.length < 1) return;
+                setIsSearching(true);
+                setSearchResults([]);
+                setShowSuggestions(false);
+                setSearchMode('deep');
+                try {
+                    const encodedTerm = encodeURIComponent(searchTerm);
+                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&or=(word.ilike.*${encodedTerm}*,content.ilike.*${encodedTerm}*)&word=not.is.null&order=word.asc`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setSearchResults(data);
+                    }
+                } catch (err) {
+                    console.error('Deep search error:', err);
+                } finally {
+                    setIsSearching(false);
+                }
+            };
+
+            const selectSuggestion = async (word) => {
+                try {
+                    const encodedWord = encodeURIComponent(word);
+                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=eq.${encodedWord}`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.length > 0) {
+                            setModalContent({ item: data[0], path: [] });
+                            setSearchTerm(word);
+                            setShowSuggestions(false);
+                            setSearchResults([]);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Select suggestion error:', err);
+                }
+            };
+
+            const selectWord = (item) => {
+                setModalContent({ item, path: [] });
+            };
+
+            const navigateToRelatedArticle = (article, pathIndex) => {
+                if (typeof pathIndex === 'number') {
+                    const newPath = modalContent.path.slice(0, pathIndex + 1);
+                    setModalContent({ item: article, path: newPath });
+                } else {
+                    const newPath = [...(modalContent.path || []), modalContent.item];
+                    setModalContent({ item: article, path: newPath });
+                }
+            };
+
+            const closeModal = () => {
+                setModalContent(null);
+            };
+
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    if (searchTerm && searchTerm.length >= 1) {
+                        getSuggestions(searchTerm);
+                    } else {
+                        setSuggestions([]);
+                        setShowSuggestions(false);
+                    }
+                }, 300);
+                return () => clearTimeout(timer);
+            }, [searchTerm]);
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (searchRef.current && !searchRef.current.contains(event.target)) {
+                        setShowSuggestions(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 p-3 sm:p-4">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="text-center mb-6 sm:mb-8 pt-4 sm:pt-8">
+                            <div className="mb-4">
+                                <img src="https://raw.githubusercontent.com/Amilaeduhelp/-2025/main/chitrakala%20gnanakoshaya-01.png" alt="ගුරුගේ චිත්‍රකලා ඥානකෝෂය" className="mx-auto max-w-full h-auto rounded-2xl" />
+                            </div>
+                            <p className="text-amber-700 text-sm sm:text-base px-2">ගුරුගේ චිත්‍රකලා ඥානකෝෂයෙන් චිත්‍රකලාව හා සම්බන්ධ තේමා පිළිබඳ තොරතුරු ගවේෂණය කරන්න.</p>
+                        </div>
+
+                        <div className="relative mb-6 sm:mb-8" ref={searchRef}>
+                            <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6">
+                                <div className="relative">
+                                    <div className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-amber-700"><SearchIcon /></div>
+                                    <input type="text" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setSearchResults([]); setSearchMode(''); }} onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} placeholder="චිත්‍රකලා වචනයක් type කරන්න..." className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 border-2 border-amber-300 rounded-xl focus:outline-none focus:border-amber-500 text-base sm:text-lg" />
+                                </div>
+                                
+                                {searchTerm && (
+                                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                        <button onClick={normalSearch} disabled={isSearching} className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white py-2.5 sm:py-3 rounded-xl font-bold transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                                            {isSearching && searchMode === 'normal' ? <LoaderIcon /> : <SearchIcon />}
+                                            <span>සොයන්න</span>
+                                        </button>
+                                        <button onClick={deepSearch} disabled={isSearching} className="bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-700 hover:to-red-600 text-white py-2.5 sm:py-3 rounded-xl font-bold transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                                            {isSearching && searchMode === 'deep' ? <LoaderIcon /> : <SearchIcon />}
+                                            <span>තවදුරටත් සොයන්න</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div className="mt-3 sm:mt-4 border-t-2 border-amber-200 pt-3 sm:pt-4 max-h-48 sm:max-h-60 overflow-y-auto">
+                                        <p className="text-xs sm:text-sm text-amber-800 mb-2 font-semibold px-1">යෝජනා: ({suggestions.length})</p>
+                                        <div className="space-y-1 sm:space-y-2">
+                                            {suggestions.map((item) => (
+                                                <button key={item.id} onClick={() => selectSuggestion(item.word)} className="w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200 rounded-lg transition-all transform hover:scale-[1.01] border border-amber-300 hover:border-amber-400 text-sm sm:text-base">
+                                                    <span className="font-bold text-amber-900">{item.word}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {isSearching && (
+                            <div className="text-center py-8 sm:py-12">
+                                <div className="flex justify-center mb-3 sm:mb-4"><LoaderIcon /></div>
+                                <p className="text-amber-800 text-sm sm:text-lg font-semibold">සොයමින්...</p>
+                            </div>
+                        )}
+
+                        {!isSearching && searchResults.length > 0 && (
+                            <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6">
+                                <h2 className="text-lg sm:text-xl font-bold text-amber-900 mb-4 flex items-center gap-2">
+                                    <PaletteIcon />
+                                    <span>සෙවුම් ප්‍රතිඵල ({searchResults.length})</span>
+                                </h2>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {searchResults.map((item) => (
+                                        <button key={item.id} onClick={() => selectWord(item)} className="text-left p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-xl border-2 border-amber-300 hover:border-amber-400 transition-all transform hover:scale-[1.01] shadow-md hover:shadow-lg">
+                                            <h3 className="font-bold text-amber-900 text-base sm:text-lg mb-1 sm:mb-2">{item.word}</h3>
+                                            <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">{item.content.substring(0, 150)}...</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {!isSearching && searchResults.length === 0 && searchMode && (
+                            <div className="text-center py-8 sm:py-12 bg-white rounded-2xl shadow-xl p-6">
+                                <div className="text-5xl sm:text-6xl mb-3 sm:mb-4">🎨</div>
+                                <p className="text-amber-800 text-base sm:text-lg font-semibold">ප්‍රතිඵල හමු නොවීය</p>
+                                <p className="text-gray-600 text-xs sm:text-sm mt-2">වෙනත් වචනයක් උත්සාහ කරන්න</p>
+                            </div>
+                        )}
+
+                        {modalContent && (
+                            <ContentModal item={modalContent.item} onClose={closeModal} searchWord={searchTerm} onNavigate={navigateToRelatedArticle} navigationPath={modalContent.path} />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
