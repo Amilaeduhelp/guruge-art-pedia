@@ -151,6 +151,45 @@
                 return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             };
 
+            // පින්තූර හඳුනාගෙන render කරන function
+            const parseContentWithImages = (text) => {
+                if (!text) return [];
+                
+                // [IMAGE:base64data] pattern එක හඳුනාගන්න
+                const imagePattern = /\[IMAGE:(data:image\/[^;]+;base64,[^\]]+)\]/g;
+                const parts = [];
+                let lastIndex = 0;
+                let match;
+
+                while ((match = imagePattern.exec(text)) !== null) {
+                    // Image එකට කලින් text එක
+                    if (match.index > lastIndex) {
+                        parts.push({
+                            type: 'text',
+                            content: text.substring(lastIndex, match.index)
+                        });
+                    }
+                    
+                    // Image එක
+                    parts.push({
+                        type: 'image',
+                        content: match[1]
+                    });
+                    
+                    lastIndex = match.index + match[0].length;
+                }
+                
+                // අවසාන text එක
+                if (lastIndex < text.length) {
+                    parts.push({
+                        type: 'text',
+                        content: text.substring(lastIndex)
+                    });
+                }
+                
+                return parts.length > 0 ? parts : [{ type: 'text', content: text }];
+            };
+
             const renderContentWithCrossReferences = (text) => {
                 if (!text || allWords.length === 0) return text;
                 
@@ -276,6 +315,32 @@
                 }
             };
 
+            // Content පින්තූර සහිතව render කරන්න
+            const renderFullContent = () => {
+                const contentParts = parseContentWithImages(item.content);
+                
+                return contentParts.map((part, idx) => {
+                    if (part.type === 'image') {
+                        return (
+                            <div key={idx} className="my-6 flex justify-center">
+                                <img 
+                                    src={part.content} 
+                                    alt="පින්තූරය" 
+                                    className="max-w-full h-auto rounded-lg shadow-lg border-2 border-amber-200"
+                                    style={{maxHeight: '500px'}}
+                                />
+                            </div>
+                        );
+                    } else {
+                        return (
+                            <p key={idx} className={`text-gray-800 whitespace-pre-wrap leading-relaxed ${getFontSizeClass()}`}>
+                                {renderContentWithCrossReferences(part.content)}
+                            </p>
+                        );
+                    }
+                });
+            };
+
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4" onClick={handleBackdropClick}>
                     <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col" style={{maxHeight: '95vh'}}>
@@ -328,9 +393,7 @@
 
                         <div ref={contentRef} className="p-4 sm:p-6 overflow-y-auto flex-1" style={{minHeight: 0}}>
                             <div className="prose prose-sm sm:prose-lg max-w-none">
-                                <p className={`text-gray-800 whitespace-pre-wrap leading-relaxed ${getFontSizeClass()}`}>
-                                    {renderContentWithCrossReferences(item.content)}
-                                </p>
+                                {renderFullContent()}
 
                                 {relatedArticles.length > 0 && (
                                     <div className="mt-6 sm:mt-8 pt-6 border-t-2 border-amber-300">
@@ -469,29 +532,29 @@
             };
 
             const selectSuggestion = async (word) => {
-                try {
-                    const encodedWord = encodeURIComponent(word);
-                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=eq.${encodedWord}`;
-                    const response = await fetch(url, {
-                        headers: {
-                            'apikey': SUPABASE_ANON_KEY,
-                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.length > 0) {
-                            setModalContent({ item: data[0], path: [] });
-                            setSearchTerm(word);
-                            setShowSuggestions(false);
-                            setSearchResults([]);
-                        }
-                    }
-                } catch (err) {
-                    console.error('Select suggestion error:', err);
-                }
-            };
+    try {
+        const encodedWord = encodeURIComponent(word);
+        const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=eq.${encodedWord}`;
+        const response = await fetch(url, {
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.length > 0) {
+                setModalContent({ item: data[0], path: [] });
+                setSearchTerm(word);
+                setShowSuggestions(false);
+                setSearchResults([]);
+            }
+        }
+    } catch (err) {
+        console.error('Select suggestion error:', err);
+    }
+};
 
             const selectWord = (item) => {
                 setModalContent({ item, path: [] });
