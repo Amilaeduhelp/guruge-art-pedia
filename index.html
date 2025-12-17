@@ -44,6 +44,65 @@
             </svg>
         );
 
+        const InfoIcon = () => (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        function AboutModal({ onClose }) {
+            const modalRef = useRef(null);
+
+            useEffect(() => {
+                document.body.style.overflow = 'hidden';
+                return () => {
+                    document.body.style.overflow = 'unset';
+                };
+            }, []);
+
+            const handleBackdropClick = (e) => {
+                if (modalRef.current && !modalRef.current.contains(e.target)) {
+                    onClose();
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4" onClick={handleBackdropClick}>
+                    <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col" style={{maxHeight: '90vh'}}>
+                        <div className="bg-gradient-to-r from-amber-100 to-orange-100 p-4 sm:p-6 flex justify-between items-start flex-shrink-0">
+                            <div className="flex-1 pr-2">
+                                <h2 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1 sm:mb-2 leading-tight">පියසේන ගුරුගේ ඇදුරු වරුණ</h2>
+                                <p className="text-amber-800 text-xs sm:text-sm">චිත්‍රකලා ගුරුවරයා</p>
+                            </div>
+                            <button onClick={onClose} className="text-amber-900 hover:bg-amber-200 rounded-lg p-1.5 sm:p-2 transition-colors flex-shrink-0">
+                                <CloseIcon />
+                            </button>
+                        </div>
+
+                        <div className="p-4 sm:p-6 overflow-y-auto flex-1" style={{minHeight: 0}}>
+                            <div className="prose prose-sm sm:prose-lg max-w-none">
+                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 sm:p-6 rounded-lg mb-6">
+                                    <p className="text-amber-900 text-sm sm:text-base leading-relaxed text-center font-semibold">
+                                        විස්තර බලාපොරොත්තු වන්න
+                                    </p>
+                                </div>
+
+                                <div className="text-gray-700 text-sm sm:text-base leading-relaxed space-y-4">
+                                    <p className="text-center text-gray-500 italic">
+                                        මෙහි ගුරුතුමාගේ සංක්ෂිප්ත චරිත කතාව, අධ්‍යාපනික පසුබිම, කලා අත්දැකීම් සහ විශේෂත්වයන් පිළිබඳ විස්තර එකතු කෙරෙනු ඇත.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-3 sm:p-4 border-t border-gray-200 flex-shrink-0">
+                            <button onClick={onClose} className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 sm:py-3 rounded-lg font-bold transition-colors text-sm sm:text-base">හරි</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function ContentModal({ item, onClose, searchWord, onNavigate, navigationPath }) {
             const contentRef = useRef(null);
             const modalRef = useRef(null);
@@ -151,42 +210,32 @@
                 return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             };
 
-            // පින්තූර හඳුනාගෙන render කරන function
             const parseContentWithImages = (text) => {
                 if (!text) return [];
-                
-                // [IMAGE:base64data] pattern එක හඳුනාගන්න
                 const imagePattern = /\[IMAGE:(data:image\/[^;]+;base64,[^\]]+)\]/g;
                 const parts = [];
                 let lastIndex = 0;
                 let match;
 
                 while ((match = imagePattern.exec(text)) !== null) {
-                    // Image එකට කලින් text එක
                     if (match.index > lastIndex) {
                         parts.push({
                             type: 'text',
                             content: text.substring(lastIndex, match.index)
                         });
                     }
-                    
-                    // Image එක
                     parts.push({
                         type: 'image',
                         content: match[1]
                     });
-                    
                     lastIndex = match.index + match[0].length;
                 }
-                
-                // අවසාන text එක
                 if (lastIndex < text.length) {
                     parts.push({
                         type: 'text',
                         content: text.substring(lastIndex)
                     });
                 }
-                
                 return parts.length > 0 ? parts : [{ type: 'text', content: text }];
             };
 
@@ -196,19 +245,16 @@
                 const allVariations = [];
                 allWords.forEach(wordObj => {
                     if (wordObj.word === item.word) return;
-                    
                     allVariations.push({
                         variation: wordObj.word,
                         mainWord: wordObj.word,
                         id: wordObj.id
                     });
-                    
                     if (wordObj.different && typeof wordObj.different === 'string' && wordObj.different.trim() !== '') {
                         const variations = wordObj.different
                             .split('/')
                             .map(v => v.trim())
                             .filter(v => v.length > 2);
-                        
                         variations.forEach(variation => {
                             allVariations.push({
                                 variation: variation,
@@ -218,26 +264,21 @@
                         });
                     }
                 });
-                
                 allVariations.sort((a, b) => b.variation.length - a.variation.length);
-                
                 let segments = [{ text: text, isLink: false }];
 
                 allVariations.forEach(varObj => {
                     const variation = varObj.variation;
                     const mainWord = varObj.mainWord;
-                    
                     const newSegments = [];
                     segments.forEach(segment => {
                         if (segment.isLink) {
                             newSegments.push(segment);
                             return;
                         }
-                        
                         const escapedVariation = escapeRegex(variation);
                         const regex = new RegExp(`(${escapedVariation})(?=[\\s,.:;!?()\\[\\]{}\"'\\n\\r]|$)`, 'gi');
                         const parts = segment.text.split(regex);
-                        
                         parts.forEach((part) => {
                             if (part && part.toLowerCase().trim() === variation.toLowerCase().trim()) {
                                 newSegments.push({ 
@@ -305,20 +346,16 @@
                     marks.forEach(mark => {
                         mark.classList.remove('ring-2', 'ring-amber-600');
                     });
-                    
                     const firstMark = marks[0];
                     firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    
                     setTimeout(() => {
                         firstMark.classList.add('ring-2', 'ring-amber-600');
                     }, 300);
                 }
             };
 
-            // Content පින්තූර සහිතව render කරන්න
             const renderFullContent = () => {
                 const contentParts = parseContentWithImages(item.content);
-                
                 return contentParts.map((part, idx) => {
                     if (part.type === 'image') {
                         return (
@@ -450,13 +487,13 @@
             const [modalContent, setModalContent] = useState(null);
             const [isSearching, setIsSearching] = useState(false);
             const [searchMode, setSearchMode] = useState('');
+            const [showAbout, setShowAbout] = useState(false);
             const searchRef = useRef(null);
 
             const getSuggestions = async (term) => {
                 if (term.length < 1) {
                     setSuggestions([]);
-                    return;
-                }
+                    return;}
                 try {
                     const encodedTerm = encodeURIComponent(term);
                     const url = `${SUPABASE_URL}/rest/v1/art?select=id,word&word=ilike.*${encodedTerm}*&word=not.is.null&limit=10&order=word.asc`;
@@ -532,29 +569,29 @@
             };
 
             const selectSuggestion = async (word) => {
-    try {
-        const encodedWord = encodeURIComponent(word);
-        const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=eq.${encodedWord}`;
-        const response = await fetch(url, {
-            headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        if (response.ok) {
-            const data = await response.json();
-            if (data.length > 0) {
-                setModalContent({ item: data[0], path: [] });
-                setSearchTerm(word);
-                setShowSuggestions(false);
-                setSearchResults([]);
-            }
-        }
-    } catch (err) {
-        console.error('Select suggestion error:', err);
-    }
-};
+                try {
+                    const encodedWord = encodeURIComponent(word);
+                    const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=eq.${encodedWord}`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.length > 0) {
+                            setModalContent({ item: data[0], path: [] });
+                            setSearchTerm(word);
+                            setShowSuggestions(false);
+                            setSearchResults([]);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Select suggestion error:', err);
+                }
+            };
 
             const selectWord = (item) => {
                 setModalContent({ item, path: [] });
@@ -604,6 +641,16 @@
                                 <img src="https://raw.githubusercontent.com/Amilaeduhelp/-2025/main/chitrakala%20gnanakoshaya-01.png" alt="ගුරුගේ චිත්‍රකලා ඥානකෝෂය" className="mx-auto max-w-full h-auto rounded-2xl" />
                             </div>
                             <p className="text-amber-700 text-sm sm:text-base px-2">ගුරුගේ චිත්‍රකලා ඥානකෝෂයෙන් චිත්‍රකලාව හා සම්බන්ධ තේමා පිළිබඳ තොරතුරු ගවේෂණය කරන්න.</p>
+                            
+                            <div className="mt-4">
+                                <button 
+                                    onClick={() => setShowAbout(true)}
+                                    className="inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-full font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base"
+                                >
+                                    <InfoIcon />
+                                    <span>පියසේන ගුරුගේ ඇදුරු වරුණ</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="relative mb-6 sm:mb-8" ref={searchRef}>
@@ -675,6 +722,10 @@
 
                         {modalContent && (
                             <ContentModal item={modalContent.item} onClose={closeModal} searchWord={searchTerm} onNavigate={navigateToRelatedArticle} navigationPath={modalContent.path} />
+                        )}
+
+                        {showAbout && (
+                            <AboutModal onClose={() => setShowAbout(false)} />
                         )}
                     </div>
                 </div>
