@@ -71,7 +71,7 @@
                     <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col" style={{maxHeight: '90vh'}}>
                         <div className="bg-gradient-to-r from-amber-100 to-orange-100 p-4 sm:p-6 flex justify-between items-start flex-shrink-0">
                             <div className="flex-1 pr-2">
-                                <h2 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1 sm:mb-2 leading-tight">පියසේන ගුරුගේ ඇදුරු වරුණ</h2>
+                                <h2 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1 sm:mb-2 leading-tight">ගුරුතුමා ගැන</h2>
                                 <p className="text-amber-800 text-xs sm:text-sm">චිත්‍රකලා ගුරුවරයා</p>
                             </div>
                             <button onClick={onClose} className="text-amber-900 hover:bg-amber-200 rounded-lg p-1.5 sm:p-2 transition-colors flex-shrink-0">
@@ -314,10 +314,11 @@
                     } else {
                         if (searchWord && segment.text) {
                             const escapedSearch = escapeRegex(searchWord);
-                            const regex = new RegExp(`(${escapedSearch})`, 'gi');
+                            // Match complete words that contain the search term
+                            const regex = new RegExp(`(\\S*${escapedSearch}\\S*)`, 'gi');
                             const parts = segment.text.split(regex);
                             return parts.map((part, partIdx) => {
-                                if (part.toLowerCase() === searchWord.toLowerCase()) {
+                                if (part && new RegExp(escapedSearch, 'i').test(part) && part.trim() !== '') {
                                     return <mark key={`${index}-${partIdx}`} className="bg-yellow-200 px-1 rounded">{part}</mark>;
                                 }
                                 return <span key={`${index}-${partIdx}`}>{part}</span>;
