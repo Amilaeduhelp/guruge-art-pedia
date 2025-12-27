@@ -62,7 +62,7 @@
             }, []);
 
             const handleBackdropClick = (e) => {
-                if (modalRef.current && !modalRef.current.contains(e.target)) {
+                if (e.target === e.currentTarget) {
                     onClose();
                 }
             };
@@ -90,7 +90,12 @@
 
                                 <div className="text-gray-700 text-sm sm:text-base leading-relaxed space-y-4">
                                     <p className="text-center text-gray-500 italic">
-                                        මෙහි ගුරුතුමාගේ සංක්ෂිප්ත චරිත කතාව, අධ්‍යාපනික පසුබිම, කලා අත්දැකීම් සහ විශේෂත්වයන් පිළිබඳ විස්තර එකතු කෙරෙනු ඇත.
+									 <img
+  src="https://raw.githubusercontent.com/Amilaeduhelp/guruge-art-pedia/main/piyasenaPG.jpg"
+  alt="පියසේන ගුරුගේ ඇදුරුතුමා"
+  className="mx-auto max-w-full h-auto rounded-2xl"
+/>
+                                        මෙහි ගුරුතුමාගේ සංක්ෂිප්ත චරිත කතාව, අධ්‍යාපනික පසුබිම, කලා අත්දැකීම් සහ විශේෂත්වයන් පිළිබඳ විස්තර එකතු කෙරෙනු ඇත.										
                                     </p>
                                 </div>
                             </div>
@@ -107,7 +112,7 @@
         function ContentModal({ item, onClose, searchWord, onNavigate, navigationPath }) {
             const contentRef = useRef(null);
             const modalRef = useRef(null);
-            const [relatedArticles, setRelatedArticles] = useState([]);
+            const [relatedArticles, setRelatedArticles] = useState({ further: [], additional: [] });
             const [loadingRelated, setLoadingRelated] = useState(false);
             const [fontSize, setFontSize] = useState('base');
             const [allWords, setAllWords] = useState([]);
@@ -132,7 +137,6 @@
                         });
                         if (response.ok) {
                             const data = await response.json();
-                            console.log('Fetched words:', data.length);
                             setAllWords(data);
                         }
                     } catch (err) {
@@ -150,16 +154,32 @@
 
             useEffect(() => {
                 const fetchRelatedArticles = async () => {
-                    if (!searchWord) return;
+                    if (!item.content) return;
                     setLoadingRelated(true);
                     try {
-                        const words = searchWord.split(/\s+/).filter(w => w.length > 2);
-                        if (words.length === 0) {
-                            setLoadingRelated(false);
-                            return;
-                        }
-                        const searchTerms = words.map(w => `content.ilike.*${encodeURIComponent(w)}*`).join(',');
-                        const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&or=(${searchTerms})&word=neq.${encodeURIComponent(searchWord)}&limit=6`;
+                        const contentWords = [];
+                        allWords.forEach(wordObj => {
+                            if (wordObj.word === item.word) return;
+                            const regex = new RegExp(`\\b${wordObj.word}\\b`, 'i');
+                            if (regex.test(item.content)) {
+                                contentWords.push(wordObj.word);
+                            }
+                            if (wordObj.different) {
+                                const variations = wordObj.different.split('/').map(v => v.trim());
+                                variations.forEach(variation => {
+                                    const varRegex = new RegExp(`\\b${variation}\\b`, 'i');
+                                    if (varRegex.test(item.content)) {
+                                        contentWords.push(wordObj.word);
+                                    }
+                                });
+                            }
+                        });
+                        const uniqueWords = [...new Set(contentWords)].slice(0, 6);
+                        const relatedIds = uniqueWords.map(w => {
+                            const found = allWords.find(wo => wo.word === w);
+                            return found ? found.id : null;
+                        }).filter(Boolean);
+                        const url = `${SUPABASE_URL}/rest/v1/art?select=id,word,content&word=not.is.null&limit=100`;
                         const response = await fetch(url, {
                             headers: {
                                 'apikey': SUPABASE_ANON_KEY,
@@ -168,19 +188,28 @@
                             }
                         });
                         if (response.ok) {
-                            const data = await response.json();
-                            setRelatedArticles(data);
+                            const allData = await response.json();
+                            const unrelated = allData
+                                .filter(a => a.word !== item.word && !relatedIds.includes(a.id))
+                                .sort(() => Math.random() - 0.5)
+                                .slice(0, 6);
+                            setRelatedArticles({
+                                further: uniqueWords.map(w => allWords.find(wo => wo.word === w)),
+                                additional: unrelated
+                            });
                         }
                     } catch (err) {
                         console.error('Error fetching related articles:', err);
                     }
                     setLoadingRelated(false);
                 };
-                fetchRelatedArticles();
-            }, [searchWord]);
+                if (allWords.length > 0) {
+                    fetchRelatedArticles();
+                }
+            }, [item.id, allWords]);
 
             const handleBackdropClick = (e) => {
-                if (modalRef.current && !modalRef.current.contains(e.target)) {
+                if (e.target === e.currentTarget) {
                     onClose();
                 }
             };
@@ -306,7 +335,7 @@
                                     e.stopPropagation();
                                     handleWordClick(segment.mainWord);
                                 }}
-                                className={`text-blue-600 hover:text-blue-800 underline font-semibold cursor-pointer hover:bg-blue-50 px-0.5 rounded transition-colors ${highlighted ? 'bg-yellow-200' : ''}`}
+                                className={`text-amber-600 hover:text-amber-800 underline font-semibold cursor-pointer hover:bg-amber-50 px-0.5 rounded transition-colors ${highlighted ? 'bg-yellow-200' : ''}`}
                                 title={`${segment.mainWord} වෙත යන්න`}
                             >
                                 {segment.text}
@@ -433,20 +462,40 @@
                             <div className="prose prose-sm sm:prose-lg max-w-none">
                                 {renderFullContent()}
 
-                                {relatedArticles.length > 0 && (
+                                {relatedArticles.further && relatedArticles.further.length > 0 && (
+                                    <div className="mt-6 sm:mt-8 pt-6 border-t-2 border-amber-300">
+                                        <h3 className="text-lg sm:text-xl font-bold text-amber-900 mb-4 flex items-center gap-2">
+                                            <span>📖</span>
+                                            <span>වැඩිදුර කියවීම්</span>
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {relatedArticles.further.map((article) => (
+                                                <button key={article.id} onClick={(e) => { e.stopPropagation(); onNavigate(article); }} className="text-left p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-lg border-2 border-amber-300 hover:border-amber-400 transition-all transform hover:scale-[1.02]">
+                                                    <h4 className="font-bold text-amber-900 text-sm sm:text-base mb-1 flex items-center gap-2">
+                                                        <span className="text-amber-700">→</span>
+                                                        {article.word}
+                                                    </h4>
+                                                    {article.content && <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">{article.content.substring(0, 100)}...</p>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {relatedArticles.additional && relatedArticles.additional.length > 0 && (
                                     <div className="mt-6 sm:mt-8 pt-6 border-t-2 border-amber-300">
                                         <h3 className="text-lg sm:text-xl font-bold text-amber-900 mb-4 flex items-center gap-2">
                                             <span>🎨</span>
                                             <span>අතිරේක කියවීම්</span>
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3">
-                                            {relatedArticles.map((article) => (
+                                            {relatedArticles.additional.map((article) => (
                                                 <button key={article.id} onClick={(e) => { e.stopPropagation(); onNavigate(article); }} className="text-left p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-lg border-2 border-amber-300 hover:border-amber-400 transition-all transform hover:scale-[1.02]">
                                                     <h4 className="font-bold text-amber-900 text-sm sm:text-base mb-1 flex items-center gap-2">
                                                         <span className="text-amber-700">→</span>
                                                         {article.word}
                                                     </h4>
-                                                    <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">{article.content.substring(0, 100)}...</p>
+                                                    {article.content && <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">{article.content.substring(0, 100)}...</p>}
                                                 </button>
                                             ))}
                                         </div>
@@ -456,7 +505,7 @@
                                 {loadingRelated && (
                                     <div className="mt-6 sm:mt-8 pt-6 border-t-2 border-amber-300 text-center">
                                         <div className="flex justify-center mb-2"><LoaderIcon /></div>
-                                        <p className="text-amber-800 text-xs sm:text-sm">අතිරේක කියවීම් සොයමින්...</p>
+                                        <p className="text-amber-800 text-xs sm:text-sm">කියවීම් සොයමින්...</p>
                                     </div>
                                 )}
                             </div>
